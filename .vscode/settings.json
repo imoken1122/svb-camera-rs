@@ -1,0 +1,8 @@
+{
+    "rust-analyzer.linkedProjects": [
+        "svb-py/Cargo.toml",
+
+    ],
+
+    "rust-analyzer.showUnlinkedFileNotification": false
+}
