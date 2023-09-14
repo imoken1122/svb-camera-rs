@@ -106,19 +106,28 @@ pub struct ControlTypeState {
 }
 #[derive(Debug, Copy, Clone)]
 pub struct ROIFormat {
-    pub camera_id: i32,
     pub startx: i32,
     pub starty: i32,
     pub width: i32,
     pub height: i32,
-    pub bin: i32,
+    pub bin: i32,}
+impl ROIFormat {
+    pub fn new() -> Self {
+        Self { 
+            startx :0 ,
+            starty : 0,
+            width : 0,
+            height : 0,
+            bin : 0
+        }
+    }
 }
 impl fmt::Display for ROIFormat {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "\nCamera ID: {}\nStart X: {}\nStart Y: {}\nWidth: {}\nHeight: {}\nBin: {}\n",
-            self.camera_id, self.startx, self.starty, self.width, self.height, self.bin,
+            "\nStart X: {}\nStart Y: {}\nWidth: {}\nHeight: {}\nBin: {}\n",
+            self.startx, self.starty, self.width, self.height, self.bin,
         )
     }
 }

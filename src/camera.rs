@@ -1,7 +1,8 @@
+use crate::debayer::BayerPattern;
 use crate::utils;
 use crate::*;
 use crate::{
-    libsvb,
+    debayer, libsvb,
     libsvb::{convert_err_code, ControlTypeState, ROIFormat, SVBError},
 };
 use image::DynamicImage;
@@ -16,12 +17,13 @@ pub struct Camera {
     pub info: libsvb::SVB_CAMERA_INFO,
     pub prop: libsvb::SVB_CAMERA_PROPERTY,
     pub ctype2caps: HashMap<libsvb::SVB_CONTROL_TYPE, libsvb::SVB_CONTROL_CAPS>,
+    pub roi : ROIFormat
 }
 
 pub trait ImageProcessor {
-    fn save_img(&self, dyn_img: DynamicImage, extention: &str);
-    fn save_buffer(&self, buf: BufType, extention: &str);
-    fn buf_to_img(&self, buffer: BufType, img_type: libsvb::SVB_IMG_TYPE) -> DynamicImage;
+    fn save_img(&self, img :  image::RgbImage, extention: &str);
+    fn save_raw(&self, buf: BufType);
+    fn buf_to_img(&self, buffer: BufType, alg: debayer::Demosaic) -> image::RgbImage;
     fn buf_to_fits(&self, buf: BufType) -> BufType;
 }
 
@@ -35,6 +37,7 @@ impl Camera {
             info: libsvb::SVB_CAMERA_INFO::new(),
             prop: libsvb::SVB_CAMERA_PROPERTY::new(),
             ctype2caps: HashMap::new(),
+            roi : ROIFormat::new() 
         };
         camera
     }
@@ -62,14 +65,16 @@ impl Camera {
         };
         debug!("{}", self.prop);
 
+        self.roi = self.get_roi_format().unwrap();
         //get control capability and push to HashMap
         let num_of_ctls = self.get_num_of_controls().unwrap();
-        debug!("Num of control types {}", num_of_ctls);
         for ctl_idx in 0..num_of_ctls {
             let ctl_cpas = self.get_ctl_caps_by_idx(ctl_idx).unwrap();
             debug!("{}", ctl_cpas);
             self.ctype2caps.insert(ctl_cpas.ControlType, ctl_cpas);
         }
+
+
     }
     pub fn open(&self) -> Result<(), SVBError> {
         match libsvb::_open_camera(self.id) {
@@ -86,7 +91,10 @@ impl Camera {
     pub fn get_num_of_controls(&self) -> Result<i32, SVBError> {
         let mut num_ctls = 0;
         match libsvb::_get_num_of_controls(self.id, &mut num_ctls) {
-            0 => Ok(num_ctls),
+
+            0 => {
+                debug!("Num of control types {}", num_ctls);
+                Ok(num_ctls)},
             code => Err(convert_err_code(code)),
         }
     }
@@ -174,7 +182,6 @@ impl Camera {
         ) {
             SVBError::Success => {
                 let roi = ROIFormat {
-                    camera_id,
                     startx,
                     starty,
                     width,
@@ -188,7 +195,7 @@ impl Camera {
         }
     }
     pub fn set_roi_format(
-        &self,
+        &mut self,
         startx: i32,
         starty: i32,
         width: i32,
@@ -196,10 +203,13 @@ impl Camera {
         bin: i32,
     ) -> Result<(), SVBError> {
         match libsvb::_set_roi_format(self.id, startx, starty, width, height, bin) {
-            SVBError::Success => Ok(debug!(
+            SVBError::Success => {
+                self.roi = ROIFormat{ startx, starty, width, height, bin};
+                Ok(debug!(
                 "set ROI format startx : {}\nstarty:{}\nwidth:{}\nheight:{}\nbin:{}",
                 startx, starty, width, height, bin
-            )),
+            ))},
+
             e => Err(e),
         }
     }
@@ -233,7 +243,7 @@ impl Camera {
         vec![0; buf_size as usize]
     }
     fn get_buffer_size(&self) -> BufSize {
-        let roi = self.get_roi_format().unwrap();
+        let roi = self.roi;
         let img_type = self.get_img_type().unwrap();
         let mut buf_size: i64 = roi.width as i64 * roi.height as i64;
 
@@ -245,12 +255,13 @@ impl Camera {
         };
         buf_size
     }
+    fn get_bayer_pattern(&self) -> u32 {
+        self.prop.BayerPattern
+    }
 }
 
 impl ImageProcessor for Camera {
-    fn save_img(&self, dyn_img: DynamicImage, extention: &str) {
-        // TODO
-        // supoorte FITS extentino
+    fn save_img(&self, img: image::RgbImage, extention: &str) {
         let ext = match extention {
             "jpg" => image::ImageFormat::Jpeg,
             "png" => image::ImageFormat::Png,
@@ -258,13 +269,13 @@ impl ImageProcessor for Camera {
             _ => panic!("Not supported image extension"),
         };
         let output_path = utils::generate_filename(extention);
-        match dyn_img.save_with_format(output_path.clone(), ext) {
+        match img.save_with_format(output_path.clone(), ext) {
             Ok(()) => debug!("Image saved to {}", output_path),
             Err(e) => panic!("Failed to save image : {}", e),
         }
     }
-    fn save_buffer(&self, buf: BufType, extention: &str) {
-        let output_path = utils::generate_filename(extention);
+    fn save_raw(&self, buf: BufType) {
+        let output_path = utils::generate_filename("raw");
         let mut file = match File::create(&output_path) {
             Ok(file) => file,
             Err(e) => {
@@ -279,22 +290,28 @@ impl ImageProcessor for Camera {
             Err(e) => eprintln!("Failed to save buffer {:?}", e),
         }
     }
-    fn buf_to_img(&self, buffer: BufType, img_type: libsvb::SVB_IMG_TYPE) -> DynamicImage {
-        let roi = self.get_roi_format().unwrap();
+    fn buf_to_img(&self, buffer: BufType, alg: debayer::Demosaic) -> image::RgbImage {
+        let roi = self.roi;
         let width = roi.width as u32;
         let height = roi.height as u32;
+        let img_type = self.get_img_type().unwrap();
+        let bayer_idx = self.get_bayer_pattern();
+        let bayer_pattern = debayer::cfa_from_u32(bayer_idx);
+        let runtime = debayer::Debayer::new(width, height, bayer_pattern);
         // convert to image by image type (RAW8,RAW16,RGB24,Y8)
-        let dyn_img = match img_type {
-            libsvb::SVB_IMG_TYPE_SVB_IMG_RGB24 => DynamicImage::ImageRgb8(
-                image::RgbImage::from_raw(width, height, buffer.to_vec()).unwrap(),
-            ),
-            libsvb::SVB_IMG_TYPE_SVB_IMG_RAW8 => DynamicImage::ImageLuma8(
-                image::GrayImage::from_raw(width, height, buffer.to_vec()).unwrap(),
-            ),
+        let debayer_buf = match img_type {
+            libsvb::SVB_IMG_TYPE_SVB_IMG_RAW8 => {
+                runtime.run_from_buf(buffer, debayer::Depth::Depth8, alg)
+            }
+
+            libsvb::SVB_IMG_TYPE_SVB_IMG_RAW16 => {
+                runtime.run_from_buf(buffer, debayer::Depth::Depth16LE, alg)
+            }
 
             _ => panic!("Not supoorted image type"),
         };
-        dyn_img
+
+        runtime.buffer_to_rgb_image(&debayer_buf.unwrap()).unwrap()
     }
 
     /// buffer convert to fits format
@@ -308,7 +325,7 @@ impl ImageProcessor for Camera {
         }
 
         let mut fits = Vec::new();
-        let roi = self.get_roi_format().unwrap();
+        let roi = self.roi;
         let img_t = self.get_img_type().unwrap();
 
         let (w, h) = (
