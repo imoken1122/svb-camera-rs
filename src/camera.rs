@@ -1,19 +1,18 @@
-use crate::debayer::BayerPattern;
 use crate::utils;
 use crate::*;
 use crate::{
     debayer, libsvb,
     libsvb::{convert_err_code, ControlTypeState, ROIFormat, SVBError},
 };
-use image::DynamicImage;
+
 use image::{self};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 #[derive(Debug, Clone)]
 pub struct Camera {
-    id: i32,
-    idx: i32,
+    pub id: i32,
+    pub idx: i32,
     pub info: libsvb::SVB_CAMERA_INFO,
     pub prop: libsvb::SVB_CAMERA_PROPERTY,
     pub ctype2caps: HashMap<libsvb::SVB_CONTROL_TYPE, libsvb::SVB_CONTROL_CAPS>,
@@ -23,7 +22,7 @@ pub struct Camera {
 pub trait ImageProcessor {
     fn save_img(&self, img :  image::RgbImage, extention: &str);
     fn save_raw(&self, buf: BufType);
-    fn buf_to_img(&self, buffer: BufType, alg: debayer::Demosaic) -> image::RgbImage;
+    fn buf_to_img(&self, buffer: BufType, alg: debayer::Demosaic) -> Result<image::RgbImage,String>;
     fn buf_to_fits(&self, buf: BufType) -> BufType;
 }
 
@@ -69,9 +68,10 @@ impl Camera {
         //get control capability and push to HashMap
         let num_of_ctls = self.get_num_of_controls().unwrap();
         for ctl_idx in 0..num_of_ctls {
-            let ctl_cpas = self.get_ctl_caps_by_idx(ctl_idx).unwrap();
-            debug!("{}", ctl_cpas);
-            self.ctype2caps.insert(ctl_cpas.ControlType, ctl_cpas);
+            let ctl_caps = self.get_ctl_caps_by_idx(ctl_idx).unwrap();
+            debug!("{}", ctl_caps);
+            self.set_ctl_value( ctl_caps.ControlType, ctl_caps.DefaultValue,0);
+            self.ctype2caps.insert(ctl_caps.ControlType, ctl_caps);
         }
 
 
@@ -88,6 +88,15 @@ impl Camera {
             e => Err(e),
         }
     }
+    pub fn get_info(&self) -> libsvb::SVB_CAMERA_INFO{
+        self.info
+
+    }
+    pub fn get_property(&self) -> libsvb::SVB_CAMERA_PROPERTY{
+        self.prop
+
+    }
+
     pub fn get_num_of_controls(&self) -> Result<i32, SVBError> {
         let mut num_ctls = 0;
         match libsvb::_get_num_of_controls(self.id, &mut num_ctls) {
@@ -124,7 +133,7 @@ impl Camera {
         &self,
         ctl_type: libsvb::SVB_CONTROL_TYPE,
         value: libsvb::SVBControlValue,
-        is_auto: libsvb::SVB_BOOL,
+        is_auto: u32,
     ) -> Result<(), SVBError> {
         match libsvb::_set_ctl_value(self.id, ctl_type, value, is_auto) {
             SVBError::Success => Ok(debug!("Set value {} of control type {}", value, ctl_type)),
@@ -162,6 +171,18 @@ impl Camera {
                     e => Err(e),
                 }
             }
+        }
+    }
+    pub fn get_video_frame(
+        &self,
+        wait_ms: i32
+    ) -> Result<BufType, SVBError> {
+        let buf_size = self.get_buffer_size();
+        let mut buf = self.create_buffer(buf_size);
+        let mut pbuf = buf.as_mut_ptr();
+        match libsvb::_get_video_data(self.id, pbuf, buf_size, wait_ms) {
+            SVBError::Success => Ok(buf),
+            e => Err(e),
         }
     }
     pub fn get_roi_format(&self) -> Result<ROIFormat, SVBError> {
@@ -255,7 +276,7 @@ impl Camera {
         };
         buf_size
     }
-    fn get_bayer_pattern(&self) -> u32 {
+    pub fn get_bayer_pattern(&self) -> u32 {
         self.prop.BayerPattern
     }
 }
@@ -290,7 +311,7 @@ impl ImageProcessor for Camera {
             Err(e) => eprintln!("Failed to save buffer {:?}", e),
         }
     }
-    fn buf_to_img(&self, buffer: BufType, alg: debayer::Demosaic) -> image::RgbImage {
+    fn buf_to_img(&self, buffer: BufType, alg: debayer::Demosaic) -> Result<image::RgbImage, String> {
         let roi = self.roi;
         let width = roi.width as u32;
         let height = roi.height as u32;
@@ -308,10 +329,10 @@ impl ImageProcessor for Camera {
                 runtime.run_from_buf(buffer, debayer::Depth::Depth16LE, alg)
             }
 
-            _ => panic!("Not supoorted image type"),
+            _ => {error!("Not supoorted image type"); Err(bayer::BayerError::WrongDepth)}
         };
 
-        runtime.buffer_to_rgb_image(&debayer_buf.unwrap()).unwrap()
+        Ok(runtime.buffer_to_rgb_image(&debayer_buf.unwrap()).unwrap())
     }
 
     /// buffer convert to fits format
