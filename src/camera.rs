@@ -15,7 +15,7 @@ pub struct Camera {
     pub idx: i32,
     pub info: libsvb::SVB_CAMERA_INFO,
     pub prop: libsvb::SVB_CAMERA_PROPERTY,
-    pub ctype2caps: HashMap<libsvb::SVB_CONTROL_TYPE, libsvb::SVB_CONTROL_CAPS>,
+    pub type2caps: HashMap<libsvb::SVB_CONTROL_TYPE, libsvb::SVB_CONTROL_CAPS>,
     pub roi : ROIFormat
 }
 
@@ -35,7 +35,7 @@ impl Camera {
             idx: camera_idx,
             info: libsvb::SVB_CAMERA_INFO::new(),
             prop: libsvb::SVB_CAMERA_PROPERTY::new(),
-            ctype2caps: HashMap::new(),
+            type2caps: HashMap::new(),
             roi : ROIFormat::new() 
         };
         camera
@@ -71,7 +71,7 @@ impl Camera {
             let ctl_caps = self.get_ctl_caps_by_idx(ctl_idx).unwrap();
             debug!("{}", ctl_caps);
             self.set_ctl_value( ctl_caps.ControlType, ctl_caps.DefaultValue,0);
-            self.ctype2caps.insert(ctl_caps.ControlType, ctl_caps);
+            self.type2caps.insert(ctl_caps.ControlType, ctl_caps);
         }
 
 
