@@ -1,5 +1,5 @@
 use crate::utils;
-use crate::*;
+use crate::{BufType,BufSize};
 use crate::{
     debayer, libsvb,
     libsvb::{convert_err_code, ControlTypeState, ROIFormat, SVBError},
@@ -25,7 +25,10 @@ pub trait ImageProcessor {
     fn buf_to_img(&self, buffer: BufType, alg: debayer::Demosaic) -> Result<image::RgbImage,String>;
     fn buf_to_fits(&self, buf: BufType) -> BufType;
 }
+pub fn get_num_of_camera() -> i32{
 
+    libsvb::_get_num_of_connected_cameras()
+}
 impl Camera {
     pub fn new(camera_idx: i32) -> Self {
         //camera_info.display_info();
@@ -155,9 +158,10 @@ impl Camera {
     pub fn get_video_data(
         &self,
         pbuf: Option<*mut u8>,
-        wait_ms: i32,
+       
     ) -> Result<Option<BufType>, SVBError> {
         let buf_size = self.get_buffer_size();
+        let wait_ms = self.get_wait_time();
         match pbuf {
             Some(pbuf) => match libsvb::_get_video_data(self.id, pbuf, buf_size, wait_ms) {
                 SVBError::Success => Ok(None),
@@ -175,9 +179,10 @@ impl Camera {
     }
     pub fn get_video_frame(
         &self,
-        wait_ms: i32
+       
     ) -> Result<BufType, SVBError> {
         let buf_size = self.get_buffer_size();
+        let wait_ms = self.get_wait_time();
         let mut buf = self.create_buffer(buf_size);
         let mut pbuf = buf.as_mut_ptr();
         match libsvb::_get_video_data(self.id, pbuf, buf_size, wait_ms) {
@@ -278,6 +283,17 @@ impl Camera {
     }
     pub fn get_bayer_pattern(&self) -> u32 {
         self.prop.BayerPattern
+    }
+    pub fn get_wait_time(&self) -> i32{
+        let wait_ms: i32 = (self
+            .get_ctl_value(libsvb::SVB_CONTROL_TYPE_SVB_EXPOSURE)
+            .unwrap()
+            .value
+            / 1000) as i32
+            * 2
+            + 500;
+        debug!("To get frame interval time is {}",wait_ms);
+        wait_ms
     }
 }
 

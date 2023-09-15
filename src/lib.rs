@@ -10,11 +10,3 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 pub type BufType = Vec<u8>;
 pub type BufSize = i64;
-pub type ImgType = libsvb::SVB_IMG_TYPE;
-pub type CtrlType = libsvb::SVB_CONTROL_TYPE;
-
-#[derive(Debug, Clone, Copy)]
-pub enum Endian {
-    Big,
-    Little,
-}

@@ -1,0 +1,29 @@
+[project]
+name = "pysvb"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "Momo", email = "39585852+imoken1122@users.noreply.github.com" }
+]
+dependencies = [
+    "numpy>=1.25.2",
+    "opencv-python-headless>=4.8.0.76",
+    "pytest>=7.4.2",
+]
+readme = "README.md"
+requires-python = ">= 3.11"
+
+[build-system]
+requires = ["maturin>=1.2,<2.0"]
+build-backend = "maturin"
+
+[tool.rye]
+managed = true
+dev-dependencies = [
+    "pip>=23.2.1",
+]
+
+[tool.maturin]
+python-source = "python"
+module-name = "pysvb._lowlevel"
+features = ["pyo3/extension-module"]
