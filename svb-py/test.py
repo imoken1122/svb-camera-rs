@@ -49,7 +49,20 @@ def test_set_ctl_value():
     except Exception as e:
         print(e)
         camera.close() 
+def test_get_caps():
+    n = svb.get_num_of_camera()
+    print(n)
+    camera = svb.PyCamera(0)
+    camera.init()  
 
+    n = camera.get_num_of_controls()
+    print(n)
+    for i in range(n):
+        caps = camera.get_ctl_caps(i)
+        print(caps.name, caps.default_value, caps.is_writable)
+    camera.close()
+test_get_caps()
+ 
 def test_get_frame():
 
     n = svb.get_num_of_camera()
@@ -92,4 +105,3 @@ def test_get_frame():
         print(e)
         camera.stop_video_capture()
         camera.close() 
-test_get_frame()

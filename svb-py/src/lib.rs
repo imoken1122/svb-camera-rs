@@ -52,6 +52,62 @@ enum PyControlType {
     BAD_PIXEL_CORRECTION_ENABLE,
 }
 #[pyclass]
+struct PyControlCaps{
+    name: String,
+    description: String,
+    max_value: i64,
+    min_value: i64,
+    default_value: i64,
+    is_auto_supported:u32,
+    is_writable: u32,
+    control_type: u32,
+}
+
+
+#[pymethods]
+impl PyControlCaps{
+    #[getter]
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    #[getter]
+    fn description(&self) -> &str {
+        &self.description
+    }
+
+    #[getter]
+    fn max_value(&self) -> i64 {
+        self.max_value
+    }
+
+    #[getter]
+    fn min_value(&self) -> i64 {
+        self.min_value
+    }
+
+    #[getter]
+    fn default_value(&self) -> i64 {
+        self.default_value
+    }
+
+    #[getter]
+    fn is_auto_supported(&self) -> u32 {
+        self.is_auto_supported
+    }
+
+    #[getter]
+    fn is_writable(&self) -> u32 {
+        self.is_writable
+    }
+
+    #[getter]
+    fn control_type(&self) -> u32 {
+        self.control_type
+    }
+
+}
+#[pyclass]
 struct PyROIFormat {
     pub startx: i32,
     pub starty: i32,
@@ -180,7 +236,6 @@ impl PyCameraProperty {
     }
 }
 #[pyclass]
-#[repr(transparent)]
 pub struct PyCamera {
     pub inner: Camera,
 }
@@ -208,6 +263,27 @@ impl PyCamera {
             height,
             bin,
         };
+    }
+    fn get_num_of_controls(&self,) -> PyResult<i32> {
+        Ok(self.inner.get_num_of_controls().unwrap())
+    }
+    fn get_ctl_caps(&self, ctl_idx : i32) -> PyResult<PyControlCaps>{
+        let caps = self.inner.get_ctl_caps_by_idx(ctl_idx).unwrap();
+        let a: Vec<u8> = caps.Name.iter().map(|&x| x as u8).collect();
+        let b: Vec<u8> = caps.Description.iter().map(|&x| x as u8).collect();
+        Ok(PyControlCaps {
+            name :String::from_utf8_lossy(&a).to_string(),
+            description:String::from_utf8_lossy(&b).to_string(),
+            max_value : caps.MaxValue,
+            min_value : caps.MinValue,
+            default_value : caps.DefaultValue,
+            is_auto_supported : caps.IsAutoSupported,
+            is_writable : caps.IsWritable,
+            control_type: caps.ControlType,
+            
+
+        })
+
     }
     fn get_info(&self) -> PyResult<PyCameraInfo> {
         let info = self.inner.info;
@@ -251,7 +327,7 @@ impl PyCamera {
             .inner
             .set_ctl_value(ctl_type, value, is_auto as libsvb::SVB_BOOL)
         {
-            Ok(()) => println!("Set control value"),
+            Ok(()) => (),
             Err(e) => panic!("{}", e),
         }
     }
@@ -330,5 +406,6 @@ fn svb_py(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyCameraProperty>()?;
     m.add_class::<PyDemosaic>()?;
     m.add_class::<PyCameraInfo>()?;
+    m.add_class::<PyControlCaps>()?;
     Ok(())
 }
