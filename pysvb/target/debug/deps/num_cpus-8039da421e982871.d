@@ -1,7 +1,0 @@
-/Users/momo/Desktop/rust/svbony-camera-rye/pysvb/target/debug/deps/num_cpus-8039da421e982871.rmeta: /Users/momo/.cargo/registry/src/index.crates.io-6f17d22bba15001f/num_cpus-1.16.0/src/lib.rs
-
-/Users/momo/Desktop/rust/svbony-camera-rye/pysvb/target/debug/deps/libnum_cpus-8039da421e982871.rlib: /Users/momo/.cargo/registry/src/index.crates.io-6f17d22bba15001f/num_cpus-1.16.0/src/lib.rs
-
-/Users/momo/Desktop/rust/svbony-camera-rye/pysvb/target/debug/deps/num_cpus-8039da421e982871.d: /Users/momo/.cargo/registry/src/index.crates.io-6f17d22bba15001f/num_cpus-1.16.0/src/lib.rs
-
-/Users/momo/.cargo/registry/src/index.crates.io-6f17d22bba15001f/num_cpus-1.16.0/src/lib.rs:
