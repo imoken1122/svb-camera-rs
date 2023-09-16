@@ -1,6 +1,6 @@
 [project]
 name = "pysvb"
-version = "0.1.0"
+version = "0.1.1"
 description = "Add your description here"
 authors = [
     { name = "Momo", email = "39585852+imoken1122@users.noreply.github.com" }
