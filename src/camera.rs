@@ -66,14 +66,20 @@ impl Camera {
             }
         };
         debug!("{}", self.prop);
-
-        self.roi = self.get_roi_format().unwrap();
+        self.set_roi_format(0, 0, self.prop.MaxWidth as i32, self.prop.MaxHeight as i32, 1).unwrap();
         //get control capability and push to HashMap
         let num_of_ctls = self.get_num_of_controls().unwrap();
         for ctl_idx in 0..num_of_ctls {
             let ctl_caps = self.get_ctl_caps_by_idx(ctl_idx).unwrap();
             debug!("{}", ctl_caps);
-            self.set_ctl_value( ctl_caps.ControlType, ctl_caps.DefaultValue,0);
+
+            if ctl_caps.IsWritable == 0 {
+                continue;
+            }
+            match self.set_ctl_value( ctl_caps.ControlType, ctl_caps.DefaultValue,0){
+                Ok(()) => (),
+                Err(e) => error!("{} : Failed to set default value {} of control type {}", e,ctl_caps.DefaultValue, ctl_caps.ControlType)
+            }
             self.type2caps.insert(ctl_caps.ControlType, ctl_caps);
         }
 
@@ -198,6 +204,7 @@ impl Camera {
         let mut width: i32 = 0;
         let mut height: i32 = 0;
         let mut bin: i32 = 1;
+
         match libsvb::_get_roi_format(
             camera_id,
             &mut startx,
@@ -228,6 +235,13 @@ impl Camera {
         height: i32,
         bin: i32,
     ) -> Result<(), SVBError> {
+
+        let max_width = self.prop.MaxWidth as i32;
+        let max_height = self.prop.MaxWidth as i32;
+        if max_height/bin < height || max_width/bin < width {
+            error!("ROI size is over max size. when binning is {}, max height : {}, max width : {}",bin,max_height/bin,max_width/bin);
+            return Err(SVBError::OverFlowResolution);
+        }
         match libsvb::_set_roi_format(self.id, startx, starty, width, height, bin) {
             SVBError::Success => {
                 self.roi = ROIFormat{ startx, starty, width, height, bin};

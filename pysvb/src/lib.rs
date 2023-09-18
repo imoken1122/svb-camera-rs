@@ -13,23 +13,24 @@ fn get_num_of_camera() -> PyResult<i32> {
 #[pyclass]
 #[derive(Debug, Clone)]
 enum PyDemosaic {
-    None,
-    NearestNeighbour,
+    NearestNeighbour=0,
     Linear,
     Cubic,
+    None,
 }
 
 #[pyclass]
 #[derive(Debug, Clone)]
-enum PyImgType {
+enum SVBImgType {
     RAW8 = 0,
     RAW16 = 4,
     RGB24 = 10,
 }
+
 #[pyclass]
 #[derive(Debug, Clone)]
-enum PyControlType {
-    GAIN,
+enum SVBControlType {
+    GAIN = 0,
     EXPOSURE,
     GAMMA,
     GAMMA_CONTRAST,
@@ -52,7 +53,7 @@ enum PyControlType {
     BAD_PIXEL_CORRECTION_ENABLE,
 }
 #[pyclass]
-struct PyControlCaps{
+struct SVBControlCaps{
     name: String,
     description: String,
     max_value: i64,
@@ -65,7 +66,7 @@ struct PyControlCaps{
 
 
 #[pymethods]
-impl PyControlCaps{
+impl SVBControlCaps{
     #[getter]
     fn name(&self) -> &str {
         &self.name
@@ -108,7 +109,7 @@ impl PyControlCaps{
 
 }
 #[pyclass]
-struct PyROIFormat {
+struct SVBROIFormat {
     pub startx: i32,
     pub starty: i32,
     pub width: i32,
@@ -117,7 +118,7 @@ struct PyROIFormat {
 }
 
 #[pymethods]
-impl PyROIFormat {
+impl SVBROIFormat {
     #[getter]
     fn startx(&self) -> i32 {
         self.startx
@@ -145,7 +146,7 @@ impl PyROIFormat {
 }
 
 #[pyclass]
-struct PyCameraInfo {
+struct SVBCameraInfo {
     friendly_name: String,
     camera_sn: String,
     port_type: String,
@@ -154,7 +155,7 @@ struct PyCameraInfo {
 }
 
 #[pymethods]
-impl PyCameraInfo {
+impl SVBCameraInfo {
     #[getter]
     fn friendly_name(&self) -> &str {
         &self.friendly_name
@@ -182,7 +183,7 @@ impl PyCameraInfo {
 }
 
 #[pyclass]
-struct PyCameraProperty {
+struct SVBCameraProperty {
     pub max_height: i64,
     pub max_width: i64,
     pub is_color_cam: u32,
@@ -194,7 +195,7 @@ struct PyCameraProperty {
 }
 
 #[pymethods]
-impl PyCameraProperty {
+impl SVBCameraProperty {
     #[getter]
     fn max_height(&self) -> i64 {
         self.max_height
@@ -236,15 +237,15 @@ impl PyCameraProperty {
     }
 }
 #[pyclass]
-pub struct PyCamera {
+pub struct SVBCamera {
     pub inner: Camera,
 }
 #[pymethods]
-impl PyCamera {
+impl SVBCamera {
     #[new]
-    fn new(camera_idx: i32) -> PyResult<PyCamera> {
+    fn new(camera_idx: i32) -> PyResult<SVBCamera> {
         let mut camera = Camera::new(camera_idx);
-        Ok(PyCamera { inner: camera })
+        Ok(SVBCamera { inner: camera })
     }
     fn init(&mut self) {
         self.inner.init();
@@ -252,26 +253,64 @@ impl PyCamera {
     fn close(&self) {
         self.inner.close().unwrap();
     }
-    fn set_roi_format(&mut self, startx: i32, starty: i32, width: i32, height: i32, bin: i32) {
+    fn set_roi_format(&mut self, startx: i32, starty: i32, width: i32, height: i32, bin: i32) -> PyResult<()> {
+        match self.inner
+            .set_roi_format(startx, starty, width, height, bin){
+                Ok(()) => {
+                    self.inner.roi = ROIFormat {
+                        startx,
+                        starty,
+                        width,
+                        height,
+                        bin,
+                    };
+                    Ok(())
+                },
+                Err(e) => Err(pyo3::exceptions::PyBufferError::new_err(e.to_string())),
+            }
+  
+    }
+    fn set_resolution(&mut self,width: i32,height: i32) -> PyResult<()>{
+        let roi = self.inner.roi;
+        match self.inner
+            .set_roi_format(roi.startx, roi.starty, width, height, roi.bin){
+                Ok(()) =>{ 
+                    self.inner.roi = ROIFormat {
+                        startx : roi.startx,
+                        starty : roi.starty,
+                        width,
+                        height,
+                        bin : roi.bin,
+                    };
+                    Ok(())
+
+                },
+                Err(e) => Err(pyo3::exceptions::PyBufferError::new_err(e.to_string())),
+            }
+
+    }
+    fn set_bin(&mut self,bin : i32){
+        let roi = self.inner.roi;
         self.inner
-            .set_roi_format(startx, starty, width, height, bin)
+            .set_roi_format(roi.startx, roi.starty, roi.width, roi.height, bin)
             .unwrap();
         self.inner.roi = ROIFormat {
-            startx,
-            starty,
-            width,
-            height,
-            bin,
+            startx : roi.startx,
+            starty : roi.starty,
+            width : roi.width,
+            height: roi.height,
+            bin 
         };
+
     }
     fn get_num_of_controls(&self,) -> PyResult<i32> {
         Ok(self.inner.get_num_of_controls().unwrap())
     }
-    fn get_ctl_caps(&self, ctl_idx : i32) -> PyResult<PyControlCaps>{
+    fn get_ctl_caps(&self, ctl_idx : i32) -> PyResult<SVBControlCaps>{
         let caps = self.inner.get_ctl_caps_by_idx(ctl_idx).unwrap();
         let a: Vec<u8> = caps.Name.iter().map(|&x| x as u8).collect();
         let b: Vec<u8> = caps.Description.iter().map(|&x| x as u8).collect();
-        Ok(PyControlCaps {
+        Ok(SVBControlCaps {
             name :String::from_utf8_lossy(&a).to_string(),
             description:String::from_utf8_lossy(&b).to_string(),
             max_value : caps.MaxValue,
@@ -285,12 +324,12 @@ impl PyCamera {
         })
 
     }
-    fn get_info(&self) -> PyResult<PyCameraInfo> {
+    fn get_info(&self) -> PyResult<SVBCameraInfo> {
         let info = self.inner.info;
         let a: Vec<u8> = info.FriendlyName.iter().map(|&x| x as u8).collect();
         let b: Vec<u8> = info.CameraSN.iter().map(|&x| x as u8).collect();
         let c: Vec<u8> = info.PortType.iter().map(|&x| x as u8).collect();
-        Ok(PyCameraInfo {
+        Ok(SVBCameraInfo {
             friendly_name: String::from_utf8_lossy(&a).to_string(),
             camera_sn: String::from_utf8_lossy(&b).to_string(),
             port_type: String::from_utf8_lossy(&c).to_string(),
@@ -298,11 +337,11 @@ impl PyCamera {
             camera_id: info.CameraID,
         })
     }
-    fn get_prop(&self) -> PyResult<PyCameraProperty> {
+    fn get_prop(&self) -> PyResult<SVBCameraProperty> {
         let prop = self.inner.prop;
-        Ok(PyCameraProperty {
-            max_height: prop.MaxWidth,
-            max_width: prop.MaxHeight,
+        Ok(SVBCameraProperty {
+            max_height: prop.MaxHeight,
+            max_width: prop.MaxWidth,
             is_color_cam: prop.IsColorCam,
             bayer_pattern: prop.BayerPattern,
             supported_bins: prop.SupportedBins,
@@ -312,9 +351,9 @@ impl PyCamera {
         })
     }
 
-    fn get_roi_format(&self) -> PyResult<PyROIFormat> {
+    fn get_roi_format(&self) -> PyResult<SVBROIFormat> {
         let roi = self.inner.get_roi_format().unwrap();
-        Ok(PyROIFormat {
+        Ok(SVBROIFormat {
             startx: roi.startx,
             starty: roi.starty,
             width: roi.width,
@@ -363,7 +402,7 @@ impl PyCamera {
 }
 
 #[pyfunction]
-fn debayer_buffer(camera: &PyCamera, buffer: Vec<u8>, alg: PyDemosaic) -> PyResult<Vec<u8>> {
+fn debayer_buffer(camera: &SVBCamera, buffer: Vec<u8>, alg: PyDemosaic) -> PyResult<Vec<u8>> {
     let roi = camera.inner.roi;
     let width = roi.width as u32;
     let height = roi.height as u32;
@@ -399,13 +438,13 @@ fn debayer_buffer(camera: &PyCamera, buffer: Vec<u8>, alg: PyDemosaic) -> PyResu
 fn _lowlevel(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_num_of_camera, m)?)?;
     m.add_function(wrap_pyfunction!(debayer_buffer, m)?)?;
-    m.add_class::<PyCamera>()?;
-    m.add_class::<PyROIFormat>()?;
-    m.add_class::<PyControlType>()?;
-    m.add_class::<PyImgType>()?;
-    m.add_class::<PyCameraProperty>()?;
+    m.add_class::<SVBCamera>()?;
+    m.add_class::<SVBROIFormat>()?;
+    m.add_class::<SVBControlType>()?;
+    m.add_class::<SVBImgType>()?;
+    m.add_class::<SVBCameraProperty>()?;
     m.add_class::<PyDemosaic>()?;
-    m.add_class::<PyCameraInfo>()?;
-    m.add_class::<PyControlCaps>()?;
+    m.add_class::<SVBCameraInfo>()?;
+    m.add_class::<SVBControlCaps>()?;
     Ok(())
 }

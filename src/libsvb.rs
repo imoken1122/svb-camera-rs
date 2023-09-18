@@ -69,6 +69,10 @@ pub enum SVBError {
     #[error("Unknown sensor type: unknown sensor type")]
     UnknownSensorType,
 
+
+    #[error("Overflow resolution: overflow resolution")]
+    OverFlowResolution,
+    
     #[error("Unknown error")]
     UnknownError,
 }
