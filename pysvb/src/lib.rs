@@ -380,7 +380,7 @@ impl SVBCamera {
     fn start_video_capture(&self) {
         self.inner.start_video_capture().unwrap();
     }
-    pub fn get_video_frame(&self, ) -> PyResult<Vec<u8>> {
+    pub fn get_raw_frame(&self, ) -> PyResult<Vec<u8>> {
         match self.inner.get_video_frame() {
             Ok(buf) => Ok(buf),
             Err(e) => Err(pyo3::exceptions::PyBufferError::new_err(e.to_string())),

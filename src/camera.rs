@@ -9,6 +9,7 @@ use image::{self};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
+use std::thread;
 #[derive(Debug, Clone)]
 pub struct Camera {
     pub id: i32,
@@ -189,12 +190,17 @@ impl Camera {
     ) -> Result<BufType, SVBError> {
         let buf_size = self.get_buffer_size();
         let wait_ms = self.get_wait_time();
+        let camera_id = self.id.clone();
         let mut buf = self.create_buffer(buf_size);
-        let mut pbuf = buf.as_mut_ptr();
-        match libsvb::_get_video_data(self.id, pbuf, buf_size, wait_ms) {
-            SVBError::Success => Ok(buf),
-            e => Err(e),
-        }
+        let th = thread::spawn(move || {
+            let mut pbuf = buf.as_mut_ptr();
+            match libsvb::_get_video_data(camera_id, pbuf, buf_size, wait_ms) {
+                SVBError::Success => Ok(buf),
+                e => Err(e),
+            }
+
+        });
+        th.join().unwrap()
     }
     pub fn get_roi_format(&self) -> Result<ROIFormat, SVBError> {
         let camera_id = self.id;

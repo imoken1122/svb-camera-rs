@@ -106,7 +106,7 @@ def test_get_frame():
     n=0
     try:
         while n < 100: 
-            buf = camera.get_video_frame()
+            buf = camera.get_raw_frame()
             buf = svb.debayer_buffer(camera,buf,PyDemosaic.Linear)
             img = np.frombuffer(bytes(buf) , dtype=np.uint8).reshape(h, w, 3)
 
