@@ -6,6 +6,7 @@ use pyo3::prelude::*;
 use svbony_camera_rs::camera::Camera;
 use svbony_camera_rs::debayer;
 use svbony_camera_rs::libsvb::{self, ROIFormat};
+
 #[pyfunction]
 fn get_num_of_camera() -> PyResult<i32> {
     Ok(libsvb::_get_num_of_connected_cameras())
@@ -398,6 +399,9 @@ impl SVBCamera {
     }
     fn set_img_type(&self, img_type: i32) {
         self.inner.set_img_type(img_type).unwrap();
+    }
+    fn adjust_white_balance(&self) {
+        self.inner.adjust_white_blance().unwrap();
     }
 }
 

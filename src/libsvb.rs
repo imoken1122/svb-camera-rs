@@ -583,3 +583,11 @@ pub fn _get_serial_number(camera_id: i32, sn: *mut SVB_SN) -> SVBError {
 pub fn _get_droped_frame(camera_id: i32, num_droppd_frame: &mut i32) -> SVBError {
     convert_err_code(unsafe { SVBGetDroppedFrames(camera_id, num_droppd_frame) })
 }
+
+
+
+pub fn _adjust_white_balance(
+    camera_id: i32,
+) -> SVBError {
+    convert_err_code(unsafe { SVBWhiteBalanceOnce(camera_id ) })
+}

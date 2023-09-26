@@ -84,6 +84,13 @@ impl Camera {
             self.type2caps.insert(ctl_caps.ControlType, ctl_caps);
         }
 
+        // set image type to RAW8
+        self.set_img_type(libsvb::SVB_IMG_TYPE_SVB_IMG_RAW8).unwrap();
+
+        // horizontal and vertical flip
+        self.set_ctl_value(libsvb::SVB_CONTROL_TYPE_SVB_FLIP, 3, 0).unwrap();
+
+
 
     }
     pub fn open(&self) -> Result<(), SVBError> {
@@ -190,17 +197,13 @@ impl Camera {
     ) -> Result<BufType, SVBError> {
         let buf_size = self.get_buffer_size();
         let wait_ms = self.get_wait_time();
-        let camera_id = self.id.clone();
         let mut buf = self.create_buffer(buf_size);
-        let th = thread::spawn(move || {
-            let mut pbuf = buf.as_mut_ptr();
-            match libsvb::_get_video_data(camera_id, pbuf, buf_size, wait_ms) {
+        let mut pbuf = buf.as_mut_ptr();
+        match libsvb::_get_video_data(self.id, pbuf, buf_size, wait_ms) {
                 SVBError::Success => Ok(buf),
                 e => Err(e),
             }
 
-        });
-        th.join().unwrap()
     }
     pub fn get_roi_format(&self) -> Result<ROIFormat, SVBError> {
         let camera_id = self.id;
@@ -315,6 +318,17 @@ impl Camera {
         debug!("To get frame interval time is {}",wait_ms);
         wait_ms
     }
+    pub fn adjust_white_blance(&self,) -> Result<(), SVBError> {
+        match libsvb::_adjust_white_balance(self.id){
+            SVBError::Success => {
+                debug!("Adjusted white balance");
+                Ok(())
+            }
+            e => Err(e),
+        }
+    }
+
+    
 }
 
 impl ImageProcessor for Camera {

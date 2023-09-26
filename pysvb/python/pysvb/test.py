@@ -84,7 +84,7 @@ def test_get_frame():
     camera = svb.SVBCamera(0)
     camera.init()  
 
-    camera.set_roi_format(0,0,600,400,1)
+    camera.set_roi_format(0,0,3600,2400,1)
 
     camera.set_img_type(0)
     assert camera.get_img_type() == 0
@@ -94,7 +94,7 @@ def test_get_frame():
     print(camera.get_ctl_value( 9))
 
 
-    camera.set_ctl_value( 1,10000, 0)
+    camera.set_ctl_value( 1,200000, 0)
     camera.set_ctl_value( 0,120, 0)
     exp= camera.get_ctl_value(1)[0]
     roi = camera.get_roi_format()
@@ -105,14 +105,14 @@ def test_get_frame():
     print(waitms)
     n=0
     try:
-        while n < 100: 
+        while n < 2: 
             buf = camera.get_raw_frame()
             buf = svb.debayer_buffer(camera,buf,PyDemosaic.Linear)
             img = np.frombuffer(bytes(buf) , dtype=np.uint8).reshape(h, w, 3)
 
             print(img[:10,:10,0])
             n+=1
-            #cv2.imwrite(f"../output/img{n}.png",img)
+            cv2.imwrite(f"../output/img{n}.png",img)
         camera.stop_video_capture()
         camera.close()
     except Exception as e:
