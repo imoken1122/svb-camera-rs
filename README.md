@@ -4,7 +4,7 @@
 
  This repository is a simplified Rust binding of SVBONY Camera driver.
  
-The SDK is distributed [here]().
+The SDK is distributed [here](https://www.svbony.jp/downloads).
 
 Tested Deviced
 - Camera
